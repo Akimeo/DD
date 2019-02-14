@@ -2,16 +2,18 @@ import sys
 import pygame
 from random import randint
 from os.path import join
+import winsound
 
 
 class Player(pygame.sprite.Sprite):
     def __init__(self, pos):
         super().__init__(all_sprites)
-        self.image = char_images['char0']
+        self.image = char_images['charR0']
         self.rect = self.image.get_rect()
         self.rect.x = pos[0] * self.rect[2]
         self.rect.y = BAR_HEIGHT + pos[1] * self.rect[3]
-        self.direction = 1
+        self.direction = 0
+        self.dirs = ['F', 'R', 'B', 'R']
         self.animation = 0
 
     def move(self, x, y):
@@ -20,14 +22,21 @@ class Player(pygame.sprite.Sprite):
         if pygame.sprite.spritecollideany(self, walls_group):
             self.rect.x -= x
             self.rect.y -= y
-        if x != 0 and self.direction != (x < 0):
-            self.image = pygame.transform.flip(self.image, True, False)
-            self.direction = not self.direction
+        else:
+            Muplay('foot_5.wav')
+        if x > 0:
+            self.direction = 3
+        elif x < 0:
+            self.direction = 1
+        elif y > 0:
+            self.direction = 0
+        elif y < 0:
+            self.direction = 2
 
     def update(self):
         self.animation = (self.animation + 1) % FPS
-        self.image = char_images['char' + str(self.animation // (FPS // 4))]
-        if self.direction:
+        self.image = char_images['char' + self.dirs[self.direction] + str(self.animation // (FPS // 4))]
+        if self.direction == 1:
             self.image = pygame.transform.flip(self.image, True, False)
 
 
@@ -106,10 +115,13 @@ BAR_WIDTH, BAR_HEIGHT = 576, 56
 TILE_WIDTH, TILE_HEIGHT = 32, 32
 screen = pygame.display.set_mode(SIZE)
 
-char_images = {'char0': pygame.image.load(join('data', 'char2', 'char0.png')),   
-               'char1': pygame.image.load(join('data', 'char2', 'char1.png')),
-               'char2': pygame.image.load(join('data', 'char2', 'char2.png')),
-               'char3': pygame.image.load(join('data', 'char2', 'char3.png'))}
+
+pmm = pygame.mixer.music
+pmm.load('data/music/gorsal - Super Smash Bros Ultimate Main Theme.mp3')
+pmm.play()
+
+Muplay = lambda name: winsound.PlaySound('data/music/' + name, winsound.SND_FILENAME)
+char_images = {'char' + h + str(n):pygame.image.load(join('data', 'char', 'char' + h + str(n) + '.png'))  for n in range(4) for h in ['R', 'B', 'F']}
 toolbar_images = {
     'full_heart': pygame.image.load(join('data', 'interface', 'full_heart.png'))}
 tile_images = {'floor_tile': pygame.image.load(
@@ -152,7 +164,7 @@ while True:
                     all_sprites.remove(wall)
                     
     screen.fill((37, 19, 26))
-    all_sprites.draw(screen)
     all_sprites.update()
+    all_sprites.draw(screen)
     clock.tick(FPS)
     pygame.display.flip()
