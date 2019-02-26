@@ -9,23 +9,26 @@ class Player(pygame.sprite.Sprite):
         super().__init__(all_sprites, player_group)
         self.image = char_images['charR0']
         self.rect = pygame.Rect(pos[0] * 32, BAR_HEIGHT + pos[1] * 32, 32, 32)
-        self.mask = pygame.mask.from_surface(self.image)
+        self.mask = mask('char')
         self.direction = 0
         self.dirs = ['F', 'R', 'B', 'R']
         self.animation = 0
 
+
     def move(self, x, y):
+        check = False
         self.rect.x += x
         self.rect.y += y
-        '''
         for door in doors_group:
             if pygame.sprite.collide_mask(self, door):
                 check = True
                 break
-        '''
         if pygame.sprite.spritecollideany(self, walls_group) or check:
-            self.rect.x -= x
-            self.rect.y -= y
+            for sprite in walls_group:
+                if pygame.sprite.collide_mask(self, sprite) or check:
+                    self.rect.x -= x
+                    self.rect.y -= y
+                    break
         if x > 0:
             self.direction = 3
         elif x < 0:
@@ -52,7 +55,7 @@ class Player(pygame.sprite.Sprite):
         if pygame.sprite.spritecollideany(self, monsters_group):
             for sprite in monsters_group:
                 if pygame.sprite.collide_mask(self, sprite):
-                    terminate()
+                    print(-1)
 
         
     def get_x(self):
@@ -114,7 +117,7 @@ class Camera:
             self.count = 4
         self.updating = True
         self.dx = d[0]
-        self.dy=d[1]
+        self.dy = d[1]
 
     def is_updating(self):
         return self.updating
@@ -141,10 +144,12 @@ class Floor(pygame.sprite.Sprite):
 class Wall(pygame.sprite.Sprite):
     def __init__(self, type, pos):
         super().__init__(all_sprites, tiles_group, walls_group)
+        self.mask = mask('full')
         if type == 'top':
             self.image = wall_images['top' + str(randint(0, 2))]
         elif type == 'bot':
             self.image = wall_images['bot' + str(randint(0, 1))]
+            self.mask = mask('bot')
         else:
             if pos[1] == -1 or pos[1] == 11 or pos[1] == 23:
                 self.image = wall_images['wall2']
@@ -164,7 +169,7 @@ class Door(pygame.sprite.Sprite):
         self.rect = self.image.get_rect()
         self.rect.x = pos_x * TILE_WIDTH
         self.rect.y = BAR_HEIGHT + pos_y * TILE_HEIGHT
-        self.mask = pygame.mask.from_surface(self.image)
+        self.mask = door_masks[self.image]
         self.state = True
 
     def update(self):
@@ -189,7 +194,11 @@ class Door(pygame.sprite.Sprite):
             self.image = door_images[self.type]
             if self.type == 'lts' or self.type == 'rts':
                 self.rect.y += TILE_HEIGHT // 2
-        self.mask = pygame.mask.from_surface(self.image)
+        if self.image in door_masks:
+            self.mask = door_masks[self.image]
+        else:
+            self.mask = mask('bot')
+            print(self.type, self.state)
         self.state = not self.state
 
 
@@ -209,7 +218,6 @@ def load_room(filename):
     return list(map(lambda x: x.ljust(max_width, '.'), room_map))
 
 def make_room(room, dx, dy):
-    print(room)
     for i in range(4):
         for j in range(4):
             Floor((i + 4 * dx, j + 4 * dy))
@@ -262,14 +270,13 @@ screen = pygame.display.set_mode(SIZE)
 
 char_images = {'char' + h + str(n):pygame.image.load(join('data', 'char2', 'char' + h + str(n) + '.png'))  for n in range(4) for h in ['R', 'B', 'F']}
 
-monster_images = {'skull0': pygame.image.load(join('data', 'monsters', 'skull', 'skull0.png')),   
-               'skull1': pygame.image.load(join('data', 'monsters', 'skull', 'skull1.png')),
-               'skull2': pygame.image.load(join('data', 'monsters', 'skull', 'skull2.png')),
-               'skull3': pygame.image.load(join('data', 'monsters', 'skull', 'skull3.png'))}
+monster_images = {
+               'skull' + str(i): pygame.image.load(join('data', 'monsters', 'skull', 'skull' + str (i) + '.png')) for i in range(4)
+}
 toolbar_images = {
-    'full_heart': pygame.image.load(join('data', 'interface', 'full_heart.png'))}
-tile_images = {'floor_tile': pygame.image.load(
-    join('data', 'tiles', 'floor_tile.png'))}
+    'full_heart': pygame.image.load(join('data', 'interface', 'full_heart.png'))
+}
+tile_images = {'floor_tile': pygame.image.load(join('data', 'tiles', 'floor_tile.png'))}
 wall_images = {
     'wall0': pygame.image.load(join('data', 'tiles', 'wall_tile_0.png')),
     'wall1': pygame.image.load(join('data', 'tiles', 'wall_tile_1.png')),
@@ -278,7 +285,8 @@ wall_images = {
     'top1': pygame.image.load(join('data', 'tiles', 'top_wall_tile_1.png')),
     'top2': pygame.image.load(join('data', 'tiles', 'top_wall_tile_2.png')),
     'bot0': pygame.image.load(join('data', 'tiles', 'bot_wall_tile_0.png')),
-    'bot1': pygame.image.load(join('data', 'tiles', 'bot_wall_tile_1.png'))}
+    'bot1': pygame.image.load(join('data', 'tiles', 'bot_wall_tile_1.png'))
+}
 door_images = {
     'lf': pygame.image.load(join('data', 'tiles', 'lf_door_tile.png')),
     'rf': pygame.image.load(join('data', 'tiles', 'rf_door_tile.png')),
@@ -288,8 +296,18 @@ door_images = {
     'rts': pygame.transform.flip(pygame.image.load(
         join('data', 'tiles', 'side_door_tile.png')), True, False),
     'rbs': pygame.transform.flip(pygame.image.load(
-        join('data', 'tiles', 'side_door_tile.png')), True, True)}
+        join('data', 'tiles', 'side_door_tile.png')), True, True)
+}
 
+mask = lambda x: pygame.mask.from_surface(pygame.image.load(join('data',
+                                                                 'tiles',
+                                                                 'masks',
+                                                                 x + '.png')))
+door_masks = {
+    door_images['lf']: mask('bot'), door_images['rf']: mask('bot'),
+    door_images['rts']: mask('side_l'), door_images['rbs']: mask('side_l'),
+    door_images['lts']: mask('side_r'), door_images['lbs']: mask('side_r')
+}
 
 all_sprites = pygame.sprite.Group()
 tiles_group = pygame.sprite.Group()
@@ -316,7 +334,7 @@ while True:
         if event.type == pygame.QUIT:
             terminate()
         if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_d:
+            if event.key == 101:
                 doors_group.update()
     if camera.is_updating():
         for sprite in tiles_group:
@@ -328,13 +346,13 @@ while True:
         camera.tick()
     else:
         keys = pygame.key.get_pressed()
-        if keys[273]:
+        if keys[273] or keys[119]:
             player.move(0, -TILE_HEIGHT // 16)
-        if keys[274]:
+        if keys[274] or keys[115]:
             player.move(0, TILE_HEIGHT // 16)
-        if keys[275]:
+        if keys[275] or keys[pygame.K_d]:
             player.move(TILE_WIDTH // 16, 0)
-        if keys[276]:
+        if keys[276] or keys[97]:
             player.move(-TILE_WIDTH // 16, 0)
     screen.fill((255, 255, 255))
     player_group.update()
