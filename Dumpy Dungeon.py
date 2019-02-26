@@ -13,6 +13,8 @@ class Player(pygame.sprite.Sprite):
         self.direction = 0
         self.dirs = ['F', 'R', 'B', 'R']
         self.animation = 0
+        self.invincible = False
+        self.timer = 0
 
 
     def move(self, x, y):
@@ -48,15 +50,26 @@ class Player(pygame.sprite.Sprite):
             
 
     def update(self):
+        if self.invincible:
+            self.timer += 1
+            if self.timer == FPS:
+                self.invincible = False
+                self.timer = 0
         self.animation = (self.animation + 1) % FPS
-        self.image = char_images['char' + self.dirs[self.direction] + str(self.animation // (FPS // 4))]
+        if self.invincible and (self.animation in range(0, 13) or self.animation in range(24, 37) or self.animation in range(48, 61)):
+            self.image = char_images['damaged']
+        else:
+            self.image = char_images['char' + self.dirs[self.direction] + str(self.animation // (FPS // 4))]
         if self.direction == 1:
             self.image = pygame.transform.flip(self.image, True, False)
         if pygame.sprite.spritecollideany(self, monsters_group):
             for sprite in monsters_group:
                 if pygame.sprite.collide_mask(self, sprite):
-                    health_bar.recieve_damage()
-
+                    if not self.invincible:
+                        damage.play()
+                        health_bar.recieve_damage()
+                        self.animation = 0
+                        self.invincible = True
 
         
     def get_x(self):
@@ -95,24 +108,13 @@ class Skull(pygame.sprite.Sprite):
 
 class HealthBar(pygame.sprite.Sprite):
     def __init__(self):
-        self.HP = 6
+        self.HP = 10
 
     def recieve_damage(self):
         self.HP -= 1
         if self.HP == 0:
             terminate()
-        j = 0
-        k = 0
-        for i in range(self.HP):
-            k += 1
-            if k == 2 or i == (self.HP - 1):
-                l = 0
-                for sprite in health_bar_group:
-                    if l == j:
-                        sprite.update(k)
-                    l += 1
-                j += 1
-                k = 0
+        health_bar_group.update(self.HP)
 
 
 class Camera:
@@ -145,6 +147,7 @@ class Camera:
 
 class HP(pygame.sprite.Sprite):
     def __init__(self, pos_x):
+        self.num = pos_x * 2
         super().__init__(all_sprites, health_bar_group)
         self.image = toolbar_images['full_heart']
         self.rect = self.image.get_rect()
@@ -152,6 +155,7 @@ class HP(pygame.sprite.Sprite):
         self.rect.y = 0
 
     def update(self, hp):
+        hp = hp - self.num
         if hp == 1:
             self.image = toolbar_images['half_heart']
         elif hp == 0:
@@ -232,7 +236,7 @@ def terminate():
     sys.exit()
 
 def make_statusbar():
-    for i in range(3):
+    for i in range(5):
         HP(i)
 
 def load_room(filename):
@@ -294,6 +298,7 @@ TILE_WIDTH, TILE_HEIGHT = 32, 32
 screen = pygame.display.set_mode(SIZE)
 
 char_images = {'char' + h + str(n):pygame.image.load(join('data', 'char2', 'char' + h + str(n) + '.png'))  for n in range(4) for h in ['R', 'B', 'F']}
+char_images['damaged'] = pygame.image.load(join('data', 'char2', 'damaged.png'))
 
 monster_images = {
                'skull' + str(i): pygame.image.load(join('data', 'monsters', 'skull', 'skull' + str (i) + '.png')) for i in range(4)
@@ -352,6 +357,8 @@ clock = pygame.time.Clock()
 
 pygame.mixer.music.load(join('data', 'music', 'music.WAV'))
 pygame.mixer.music.play()
+
+damage = pygame.mixer.Sound(join('data', 'music', 'Damage.ogg'))
 
 camera = Camera()
 check = 0
