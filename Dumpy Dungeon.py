@@ -52,7 +52,7 @@ class Player(pygame.sprite.Sprite):
         if pygame.sprite.spritecollideany(self, monsters_group):
             for sprite in monsters_group:
                 if pygame.sprite.collide_mask(self, sprite):
-                    terminate()
+                    health_bar.recieve_damage()
 
         
     def get_x(self):
@@ -89,7 +89,26 @@ class Skull(pygame.sprite.Sprite):
             self.image = pygame.transform.flip(self.image, True, False)
 
 
+class HealthBar(pygame.sprite.Sprite):
+    def __init__(self):
+        self.HP = 6
 
+    def recieve_damage(self):
+        self.HP -= 1
+        if self.HP == 0:
+            terminate()
+        j = 0
+        k = 0
+        for i in range(self.HP):
+            k += 1
+            if k == 2 or i == (self.HP - 1):
+                l = 0
+                for sprite in health_bar_group:
+                    if l == j:
+                        sprite.update(k)
+                    l += 1
+                j += 1
+                k = 0
 
 
 class Camera:
@@ -122,11 +141,17 @@ class Camera:
 
 class HP(pygame.sprite.Sprite):
     def __init__(self, pos_x):
-        super().__init__(all_sprites, statusbar_group)
+        super().__init__(all_sprites, health_bar_group)
         self.image = toolbar_images['full_heart']
         self.rect = self.image.get_rect()
         self.rect.x = self.rect[2] * pos_x
         self.rect.y = 0
+
+    def update(self, hp):
+        if hp == 1:
+            self.image = toolbar_images['half_heart']
+        elif hp == 0:
+            self.image = toolbar_images['empty_heart']
 
 
 class Floor(pygame.sprite.Sprite):
@@ -267,7 +292,9 @@ monster_images = {'skull0': pygame.image.load(join('data', 'monsters', 'skull', 
                'skull2': pygame.image.load(join('data', 'monsters', 'skull', 'skull2.png')),
                'skull3': pygame.image.load(join('data', 'monsters', 'skull', 'skull3.png'))}
 toolbar_images = {
-    'full_heart': pygame.image.load(join('data', 'interface', 'full_heart.png'))}
+    'full_heart': pygame.image.load(join('data', 'interface', 'full_heart.png')),
+    'half_heart': pygame.image.load(join('data', 'interface', 'half_heart.png')),
+    'empty_heart': pygame.image.load(join('data', 'interface', 'empty_heart.png'))}
 tile_images = {'floor_tile': pygame.image.load(
     join('data', 'tiles', 'floor_tile.png'))}
 wall_images = {
@@ -295,7 +322,7 @@ all_sprites = pygame.sprite.Group()
 tiles_group = pygame.sprite.Group()
 player_group = pygame.sprite.Group()
 monsters_group = pygame.sprite.Group()
-statusbar_group = pygame.sprite.Group()
+health_bar_group = pygame.sprite.Group()
 walls_group = pygame.sprite.Group()
 doors_group = pygame.sprite.Group()
 
@@ -310,6 +337,8 @@ pygame.mixer.music.play()
 
 camera = Camera()
 check = 0
+
+health_bar = HealthBar()
 
 while True:
     for event in pygame.event.get():
@@ -341,6 +370,6 @@ while True:
     monsters_group.update()
     all_sprites.draw(screen)
     pygame.draw.rect(screen, (0, 0, 0), (0, 0, BAR_WIDTH, BAR_HEIGHT))
-    statusbar_group.draw(screen)
+    health_bar_group.draw(screen)
     clock.tick(FPS)
     pygame.display.flip()
