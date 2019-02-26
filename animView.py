@@ -26,7 +26,7 @@ def OneMakesYouLarger(image_name, zoom=2):
                 for l in range(zoom):
                     new_pixels[i * zoom + k, j * zoom + l] = pixels[i, j]
     imn = image_name.split('.')
-    imn = imn[0] + '_temp.' +imn[1]
+    imn = imn[0] + '_temp.' + imn[1]
     new_image.save(imn)
     return load_image(imn)
 
@@ -41,6 +41,12 @@ class Tile(pygame.sprite.Sprite):
         self.image = OneMakesYouLarger(img)
         self.rect = self.image.get_rect().move(0, 0)
 
+    def delete(self, mass):
+        for fil in mass:
+            imn = fil.split('.')
+            imn = imn[0] + '_temp.' + imn[1]
+            os.remove(imn)
+
  
 
 
@@ -51,7 +57,7 @@ cwd = os.getcwd()
 fn, nmf = args.files
 alp = [fn.replace('0', str(i)) for i in range(int(nmf))]
 pygame.init()
-screen = pygame.display.set_mode((32, 32))
+screen = pygame.display.set_mode((64, 64))
 clock = pygame.time.Clock()
 running = True
 all_sprites = pygame.sprite.Group()
@@ -69,3 +75,5 @@ while running:
     all_sprites.draw(screen)
     pygame.display.flip()
     clock.tick(len(alp))
+
+t.delete(alp)
