@@ -343,6 +343,8 @@ monsters_group = pygame.sprite.Group()
 health_bar_group = pygame.sprite.Group()
 walls_group = pygame.sprite.Group()
 doors_group = pygame.sprite.Group()
+first_group = pygame.sprite.Group()
+second_group = pygame.sprite.Group()
 
 player = make_level()
 make_statusbar()
@@ -357,6 +359,13 @@ camera = Camera()
 check = 0
 
 health_bar = HealthBar()
+
+for sprite in all_sprites:
+    if type(sprite) == Floor:
+        first_group.add(sprite)
+    elif type(sprite) == Floor:
+        print(sprite.type, sprite.rect.y)
+
 
 while True:
     for event in pygame.event.get():
