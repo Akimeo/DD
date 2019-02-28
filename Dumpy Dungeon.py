@@ -214,7 +214,7 @@ class Skull(pygame.sprite.Sprite):
 
 
 class Peaks(pygame.sprite.Sprite):
-    def __init__(self, pos):
+    def __init__(self, pos, room):
         super().__init__(all_sprites, trap_group)
         self.image = trap_images['peaks0']
         self.rect = self.image.get_rect()
@@ -222,8 +222,11 @@ class Peaks(pygame.sprite.Sprite):
         self.rect.y = pos[1] * 32 + BAR_HEIGHT
         self.mask = pygame.mask.from_surface(self.image)
         self.animation = 0
+        self.room = room
 
     def update(self):
+        if self.animation == 0 and self.room == player.room:
+            spiketrap.play()
         self.animation = (self.animation + 1) % (FPS * 4)
         self.image = trap_images['peaks' + str(self.animation // FPS)]
         if self.animation < 120:
@@ -328,8 +331,7 @@ class Door(pygame.sprite.Sprite):
                 if not self.previous_state:
                     self.rect.y -= TILE_HEIGHT // 2
             else:
-                self.image = pygame.transform.flip(
-                    door_images['rf'], True, False)
+                self.image = door_images['lf']
         else:
             if pygame.sprite.spritecollideany(self, player_group):
                 for sprite in player_group:
@@ -482,7 +484,7 @@ def make_room(room, dx, dy):
             elif room[y][x] == '*':
                 Skull((x + 16 * dx, y + 12 * dy), (dx, -dy))
             elif room[y][x] == '+':
-                Peaks((x + 16 * dx, y + 12 * dy))
+                Peaks((x + 16 * dx, y + 12 * dy), (dx, -dy))
 
 
 def load_room(filename):
@@ -514,6 +516,7 @@ damage = pygame.mixer.Sound(join('data', 'music', 'Damage.ogg'))
 hit = pygame.mixer.Sound(join('data', 'music', 'Hit.WAV'))
 door_sound = pygame.mixer.Sound(join('data', 'music', 'Door.WAV'))
 fire = pygame.mixer.Sound(join('data', 'music', 'Fire.WAV'))
+spiketrap = pygame.mixer.Sound(join('data', 'music', 'Spiketrap.WAV'))
 
 life = pygame.image.load(join('data', 'interface', 'life.png'))
 char_images = {'char' + h + str(n) + k:pygame.image.load(join('data', 'char', 'char' + h + str(n) + k + '.png'))  for n in range(4) for h in ['R', 'B', 'F'] for k in ['', 'R', 'L']}
