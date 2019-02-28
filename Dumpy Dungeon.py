@@ -108,6 +108,42 @@ class DamageWave(pygame.sprite.Sprite):
             projectile_group.remove(self)
 
 
+class Fire(pygame.sprite.Sprite):
+    def __init__(self, s_pos, p_pos):
+        super().__init__(enemy_projectile_group)
+        self.image = interface_images['fire']
+        self.rect = self.image.get_rect()
+        self.x, self.y = self.rect.x, self.rect.y = s_pos
+        self.mask = pygame.mask.from_surface(self.image)
+        self.p_pos = (p_pos[0] + 16 - s_pos[0], p_pos[1] + 16 - s_pos[1])
+        self.duration = 0
+        self.animation = 0
+
+    def update(self):
+        self.duration += 1
+        self.animation += 1
+        if self.animation == 15:
+            self.animation = 0
+            self.image = pygame.transform.flip(self.image, True, False)
+        self.x += self.p_pos[0] / FPS
+        self.y += self.p_pos[1] / FPS
+        self.rect.x, self.rect.y = int(self.x), int(self.y)
+        if self.duration == 60:
+            enemy_projectile_group.remove(self)
+        if pygame.sprite.spritecollideany(self, player_group):
+                for sprite in player_group:
+                    if pygame.sprite.collide_mask(self, sprite):
+                        if not player.invincible:
+                            damage.play()
+                            health_bar.recieve_damage()
+                            player.animation = 0
+                            player.invincible = True
+                            enemy_projectile_group.remove(self)
+        if pygame.sprite.spritecollideany(self, projectile_group):
+                for sprite in projectile_group:
+                    if pygame.sprite.collide_mask(self, sprite):
+                        enemy_projectile_group.remove(self)
+
 class Skull(pygame.sprite.Sprite):
     def __init__(self, pos):
         super().__init__(all_sprites, monsters_group)
@@ -119,6 +155,7 @@ class Skull(pygame.sprite.Sprite):
         self.dx = self.dy = 1
         self.animation = 0
         self.speed = 2
+        self.firerate = 0
 
     def update(self):
         dx, dy = self.dx, self.dy
@@ -134,12 +171,13 @@ class Skull(pygame.sprite.Sprite):
                 break
         for sprite in walls_group:
             if pygame.sprite.collide_rect(self, sprite) and pygame.sprite.collide_mask(self, sprite):
-                collides = True
-                if sprite.type in ['top', 'bot']:
-                    self.dy *= -1
-                else:
-                    self.dx *= -1
-                break
+                if "collides" not in locals():
+                    collides = True
+                    if sprite.type in ['top', 'bot']:
+                        self.dy *= -1
+                    else:
+                        self.dx *= -1
+                    break
         if "collides" in locals():
             self.rect.x -= self.speed * dx
             self.rect.y -= self.speed * dy
@@ -147,7 +185,11 @@ class Skull(pygame.sprite.Sprite):
         self.image = monster_images['skull' + str(self.animation // (FPS // 4))]
         if dx == -1:
             self.image = pygame.transform.flip(self.image, True, False)
-
+        if abs(player.rect.x - self.rect.x) < 64 and abs(player.rect.y - self.rect.y) < 64 and self.firerate < 0:
+            self.firerate = 120
+            fire.play()
+            Fire((self.rect.x, self.rect.y), (player.rect.x, player.rect.y))
+        self.firerate -= 1
 
 class Peaks(pygame.sprite.Sprite):
     def __init__(self, pos):
@@ -386,7 +428,8 @@ toolbar_images = {
     'full_heart': pygame.image.load(join('data', 'interface', 'full_heart.png')),
     'half_heart': pygame.image.load(join('data', 'interface', 'half_heart.png')),
     'empty_heart': pygame.image.load(join('data', 'interface', 'empty_heart.png'))}
-interface_images = {'dmg_wave': pygame.image.load(join('data', 'interface', 'dmg_wave.png'))}
+interface_images = {'dmg_wave': pygame.image.load(join('data', 'interface', 'dmg_wave.png')),
+                    'fire': pygame.image.load(join('data', 'interface', 'fire.png'))}
 tile_images = {'floor_tile': pygame.image.load(
     join('data', 'tiles', 'floor_tile.png'))}
 wall_images = {
@@ -430,6 +473,7 @@ health_bar_group = pygame.sprite.Group()
 walls_group = pygame.sprite.Group()
 doors_group = pygame.sprite.Group()
 projectile_group = pygame.sprite.Group()
+enemy_projectile_group = pygame.sprite.Group()
 
 
 player = make_level()
@@ -445,6 +489,7 @@ pmm.play(-1)
 damage = pygame.mixer.Sound(join('data', 'music', 'Damage.ogg'))
 hit = pygame.mixer.Sound(join('data', 'music', 'Hit.WAV'))
 door = pygame.mixer.Sound(join('data', 'music', 'Door.WAV'))
+fire = pygame.mixer.Sound(join('data', 'music', 'Fire.WAV'))
 
 camera = Camera()
 check = 0
@@ -512,6 +557,8 @@ while True:
         health_bar_group.draw(screen)
         projectile_group.draw(screen)
         projectile_group.update()
+        enemy_projectile_group.draw(screen)
+        enemy_projectile_group.update()
     else:
         pygame.draw.rect(screen, (255, 255, 255), (449, 16, 10, 32))
         pygame.draw.rect(screen, (255, 255, 255), (469, 16, 10, 32))
