@@ -49,6 +49,9 @@ class Player(pygame.sprite.Sprite):
             camera.update((0, 1))
             
 
+    def attack(self):
+        DamageWave(self.rect.x, self.rect.y, self.direction)
+
     def update(self):
         if self.invincible:
             self.timer += 1
@@ -74,6 +77,32 @@ class Player(pygame.sprite.Sprite):
         
     def get_x(self):
         return self.rect.x
+
+class DamageWave(pygame.sprite.Sprite):
+    def __init__(self, x, y, d):
+        super().__init__(projectile_group)
+        self.image = interface_images['dmg_wave']
+        self.rect = self.image.get_rect()
+        if d == 0:
+            d = (0, 1)
+            self.image = pygame.transform.rotate(self.image, 270)
+            self.image = pygame.transform.flip(self.image, True, False)
+        elif d == 1:
+            d = (-1, 0)
+            self.image = pygame.transform.flip(self.image, True, False)
+        elif d == 2:
+            d = (0, -1)
+            self.image = pygame.transform.rotate(self.image, 90)
+        else:
+            d = (1, 0)
+        self.rect.x, self.rect.y = x + 24 * d[0], y + 24 * d[1]
+        self.mask = pygame.mask.from_surface(self.image)
+        self.duration = 0
+
+    def update(self):
+        self.duration += 1
+        if self.duration == 20:
+            projectile_group.remove(self)
 
 
 class Skull(pygame.sprite.Sprite):
@@ -307,6 +336,7 @@ toolbar_images = {
     'full_heart': pygame.image.load(join('data', 'interface', 'full_heart.png')),
     'half_heart': pygame.image.load(join('data', 'interface', 'half_heart.png')),
     'empty_heart': pygame.image.load(join('data', 'interface', 'empty_heart.png'))}
+interface_images = {'dmg_wave': pygame.image.load(join('data', 'interface', 'dmg_wave.png'))}
 tile_images = {'floor_tile': pygame.image.load(
     join('data', 'tiles', 'floor_tile.png'))}
 wall_images = {
@@ -348,6 +378,7 @@ monsters_group = pygame.sprite.Group()
 health_bar_group = pygame.sprite.Group()
 walls_group = pygame.sprite.Group()
 doors_group = pygame.sprite.Group()
+projectile_group = pygame.sprite.Group()
 
 player = make_level()
 make_statusbar()
@@ -372,6 +403,8 @@ while True:
         if event.type == pygame.KEYDOWN:
             if event.key == 101:
                 doors_group.update()
+            if event.key == pygame.K_SPACE:
+                player.attack()
     if camera.is_updating():
         for sprite in tiles_group:
             camera.apply(sprite)
@@ -390,11 +423,19 @@ while True:
             player.move(TILE_WIDTH // 16, 0)
         if keys[276] or keys[97]:
             player.move(-TILE_WIDTH // 16, 0)
+    for dmg_wave in projectile_group:
+        if pygame.sprite.spritecollideany(dmg_wave, monsters_group):
+            for sprite in monsters_group:
+                if pygame.sprite.collide_mask(dmg_wave, sprite):
+                    all_sprites.remove(sprite)
+                    monsters_group.remove(sprite)
     screen.fill((255, 255, 255))
     player_group.update()
     monsters_group.update()
     all_sprites.draw(screen)
     pygame.draw.rect(screen, (0, 0, 0), (0, 0, BAR_WIDTH, BAR_HEIGHT))
     health_bar_group.draw(screen)
+    projectile_group.draw(screen)
+    projectile_group.update()
     clock.tick(FPS)
     pygame.display.flip()
