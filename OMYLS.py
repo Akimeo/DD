@@ -27,5 +27,5 @@ def OneMakesYouSmaller(image_name, zoom):
     new_image.save(image_name + '.png')
 
 
-OneMakesYouLarger('fire', 2)
+OneMakesYouLarger('life', 2)
 #OneMakesYouSmaller('CharF', 2)

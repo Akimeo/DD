@@ -5,17 +5,19 @@ from os.path import join
 
 
 class Player(pygame.sprite.Sprite):
-    def __init__(self, pos):
+    def __init__(self):
         super().__init__(all_sprites, player_group)
         self.image = char_images['charR0']
-        self.rect = pygame.Rect(pos[0] * 32, BAR_HEIGHT + pos[1] * 32, 32, 32)
+        self.rect = pygame.Rect(240, 240, 32, 32)
         self.mask = mask('char')
         self.direction = 0
         self.dirs = ['F', 'R', 'B', 'R']
         self.animation = 0
+        self.m_anim = ''
+        self.m_anim_t = 0
         self.invincible = False
         self.timer = 0
-
+        self.room = (0, 0)
 
     def move(self, x, y):
         check = False
@@ -41,18 +43,31 @@ class Player(pygame.sprite.Sprite):
             self.direction = 2
         if self.rect.x > WIDTH:
             camera.update((-1, 0))
+            self.room = (self.room[0] + 1, self.room[1])
         elif self.rect.x + self.rect[2] < 0:
             camera.update((1, 0))
+            self.room = (self.room[0] - 1, self.room[1])
         if self.rect.y > HEIGHT:
             camera.update((0, -1))
+            self.room = (self.room[0], self.room[1] - 1)
         elif self.rect.y + self.rect[3] < BAR_HEIGHT:
             camera.update((0, 1))
-            
+            self.room = (self.room[0], self.room[1] + 1)
+        if self.m_anim_t == 10:
+            self.m_anim_t = 0
+            if self.m_anim != 'R':
+                self.m_anim = 'R'
+            else:
+                self.m_anim = 'L'
 
     def attack(self):
         DamageWave(self.rect.x, self.rect.y, self.direction)
 
     def update(self):
+        self.m_anim_t += 1
+        if self.m_anim_t == 20:
+            self.m_anim_t = 0
+            self.m_anim = ''
         if self.invincible:
             self.timer += 1
             if self.timer == FPS:
@@ -62,7 +77,7 @@ class Player(pygame.sprite.Sprite):
         if self.invincible and (self.animation in range(0, 13) or self.animation in range(24, 37) or self.animation in range(48, 61)):
             self.image = char_images['damaged']
         else:
-            self.image = char_images['char' + self.dirs[self.direction] + str(self.animation // (FPS // 4))]
+            self.image = char_images['char' + self.dirs[self.direction] + str(self.animation // (FPS // 4)) + self.m_anim]
         if self.direction == 1:
             self.image = pygame.transform.flip(self.image, True, False)
         if pygame.sprite.spritecollideany(self, monsters_group):
@@ -146,9 +161,9 @@ class Fire(pygame.sprite.Sprite):
                         enemy_projectile_group.remove(self)
 
 class Skull(pygame.sprite.Sprite):
-    def __init__(self, pos):
+    def __init__(self, pos, room):
         super().__init__(all_sprites, monsters_group)
-        print("summoned!")
+        self.room = room
         self.image = monster_images['skull0']
         self.rect = self.image.get_rect()
         self.rect.x = pos[0] * 32
@@ -158,40 +173,45 @@ class Skull(pygame.sprite.Sprite):
         self.animation = 0
         self.speed = 2
         self.firerate = 0
+        self.active = 0
 
     def update(self):
-        dx, dy = self.dx, self.dy
-        self.rect.x += self.speed * dx
-        self.rect.y += self.speed * dy
-        for sprite in doors_group:
-            if pygame.sprite.collide_rect(self, sprite) and pygame.sprite.collide_mask(self, sprite):
-                collides = True
-                if sprite.type in ['lf', 'rf']:
-                    self.dy *= -1
-                else:
-                    self.dx *= -1
-                break
-        for sprite in walls_group:
-            if pygame.sprite.collide_rect(self, sprite) and pygame.sprite.collide_mask(self, sprite):
-                if "collides" not in locals():
+        self.animation = (self.animation + 1) % FPS
+        self.image = monster_images['skull' + str(self.animation // (FPS // 4))]
+        if self.active == 30:
+            dx, dy = self.dx, self.dy
+            self.rect.x += self.speed * dx
+            self.rect.y += self.speed * dy
+            for sprite in doors_group:
+                if pygame.sprite.collide_rect(self, sprite) and pygame.sprite.collide_mask(self, sprite):
                     collides = True
-                    if sprite.type in ['top', 'bot']:
+                    if sprite.type in ['lf', 'rf']:
                         self.dy *= -1
                     else:
                         self.dx *= -1
                     break
-        if "collides" in locals():
-            self.rect.x -= self.speed * dx
-            self.rect.y -= self.speed * dy
-        self.animation = (self.animation + 1) % FPS
-        self.image = monster_images['skull' + str(self.animation // (FPS // 4))]
-        if dx == -1:
-            self.image = pygame.transform.flip(self.image, True, False)
-        if abs(player.rect.x - self.rect.x) < 128 and abs(player.rect.y - self.rect.y) < 128 and self.firerate < 0:
-            self.firerate = 120
-            fire.play()
-            Fire((self.rect.x, self.rect.y), (player.rect.x, player.rect.y))
-        self.firerate -= 1
+            for sprite in walls_group:
+                if pygame.sprite.collide_rect(self, sprite) and pygame.sprite.collide_mask(self, sprite):
+                    if "collides" not in locals():
+                        collides = True
+                        if sprite.type in ['top', 'bot']:
+                            self.dy *= -1
+                        else:
+                            self.dx *= -1
+                        break
+            if "collides" in locals():
+                self.rect.x -= self.speed * dx
+                self.rect.y -= self.speed * dy
+            if dx == -1:
+                self.image = pygame.transform.flip(self.image, True, False)
+            if abs(player.rect.x - self.rect.x) < 128 and abs(player.rect.y - self.rect.y) < 128 and self.firerate < 0:
+                self.firerate = 120
+                fire.play()
+                Fire((self.rect.x, self.rect.y), (player.rect.x, player.rect.y))
+            self.firerate -= 1
+        elif self.room == player.room:
+            self.active += 1
+
 
 class Peaks(pygame.sprite.Sprite):
     def __init__(self, pos):
@@ -223,8 +243,8 @@ class HP(pygame.sprite.Sprite):
         super().__init__(all_sprites, health_bar_group)
         self.image = toolbar_images['full_heart']
         self.rect = self.image.get_rect()
-        self.rect.x = self.rect[2] * pos_x
-        self.rect.y = 0
+        self.rect.x = 16 + (self.rect[2] + 2) * pos_x
+        self.rect.y = 34
 
     def update(self, hp):
         hp = hp - self.num
@@ -236,7 +256,7 @@ class HP(pygame.sprite.Sprite):
 
 class HealthBar(pygame.sprite.Sprite):
     def __init__(self):
-        self.HP = 10
+        self.HP = 12
 
     def recieve_damage(self):
         self.HP -= 1
@@ -285,9 +305,12 @@ class Door(pygame.sprite.Sprite):
         self.rect.x = pos_x * TILE_WIDTH
         self.rect.y = BAR_HEIGHT + pos_y * TILE_HEIGHT
         self.mask = door_masks[self.image]
-        self.state = True
+        self.state = False
+        self.previous_state = False
 
     def update(self):
+        if self.state != self.previous_state:
+            door_sound.play()
         if self.state:
             if self.type == 'lf':
                 self.image = door_images['rbs']
@@ -295,26 +318,39 @@ class Door(pygame.sprite.Sprite):
                 self.image = door_images['lbs']
             elif self.type == 'lts':
                 self.image = door_images['rf']
-                self.rect.y -= TILE_HEIGHT // 2
+                if not self.previous_state:
+                    self.rect.y -= TILE_HEIGHT // 2
             elif self.type == 'lbs':
                 self.image = pygame.transform.flip(
                     door_images['lf'], True, False)
             elif self.type == 'rts':
                 self.image = door_images['lf']
-                self.rect.y -= TILE_HEIGHT // 2
+                if not self.previous_state:
+                    self.rect.y -= TILE_HEIGHT // 2
             else:
                 self.image = pygame.transform.flip(
                     door_images['rf'], True, False)
         else:
+            if pygame.sprite.spritecollideany(self, player_group):
+                for sprite in player_group:
+                    if pygame.sprite.collide_mask(self, sprite):
+                        if player.direction == 0:
+                            player.move(0, -player_speed * 3)
+                        elif player.direction == 1:
+                            player.move(-player_speed * 12, 0)
+                        elif player.direction == 2:
+                            player.move(0, player_speed * 5)
+                        else:
+                            player.move(player_speed * 13, 0)
             self.image = door_images[self.type]
             if self.type == 'lts' or self.type == 'rts':
-                self.rect.y += TILE_HEIGHT // 2
+                if self.previous_state:
+                    self.rect.y += TILE_HEIGHT // 2
         if self.image in door_masks:
             self.mask = door_masks[self.image]
         else:
             self.mask = mask('bot')
-        self.state = not self.state
-
+        self.previous_state = self.state
 
 class Camera:
     def __init__(self):
@@ -373,7 +409,7 @@ def make_order(ord_group):
 
 
 def make_statusbar():
-    for i in range(5):
+    for i in range(6):
         HP(i)
 
 
@@ -408,7 +444,7 @@ def make_level():
     make_room(load_room('room_e.txt'), 1, 0)
     make_room(load_room('room_s.txt'), 0, 1)
     make_room(load_room('room_w.txt'), -1, 0)
-    return Player((6, 6))
+    return Player()
 
 
 def make_room(room, dx, dy):
@@ -444,7 +480,7 @@ def make_room(room, dx, dy):
                     else:
                         Door('rbs', x + 16 * dx, y + 12 * dy)
             elif room[y][x] == '*':
-                Skull((x + 16 * dx, y + 12 * dy))
+                Skull((x + 16 * dx, y + 12 * dy), (dx, -dy))
             elif room[y][x] == '+':
                 Peaks((x + 16 * dx, y + 12 * dy))
 
@@ -476,12 +512,12 @@ camera = Camera()
 
 damage = pygame.mixer.Sound(join('data', 'music', 'Damage.ogg'))
 hit = pygame.mixer.Sound(join('data', 'music', 'Hit.WAV'))
-door = pygame.mixer.Sound(join('data', 'music', 'Door.WAV'))
+door_sound = pygame.mixer.Sound(join('data', 'music', 'Door.WAV'))
 fire = pygame.mixer.Sound(join('data', 'music', 'Fire.WAV'))
 
-
-char_images = {'char' + h + str(n):pygame.image.load(join('data', 'char2', 'char' + h + str(n) + '.png'))  for n in range(4) for h in ['R', 'B', 'F']}
-char_images['damaged'] = pygame.image.load(join('data', 'char2', 'damaged.png'))
+life = pygame.image.load(join('data', 'interface', 'life.png'))
+char_images = {'char' + h + str(n) + k:pygame.image.load(join('data', 'char', 'char' + h + str(n) + k + '.png'))  for n in range(4) for h in ['R', 'B', 'F'] for k in ['', 'R', 'L']}
+char_images['damaged'] = pygame.image.load(join('data', 'char', 'damaged.png'))
 
 monster_images = {
     'skull' + str(i): pygame.image.load(join('data', 'monsters', 'skull', 'skull' + str (i) + '.png')) for i in range(4)
@@ -562,9 +598,6 @@ while True:
             terminate()
         if event.type == pygame.KEYDOWN:
             inputer.add(chr(event.key))
-            if event.key == pygame.K_e and not pause:
-                door.play()
-                doors_group.update()
             if event.key == pygame.K_SPACE and not pause:
                 hit.play()
                 player.attack()
@@ -604,12 +637,25 @@ while True:
                         all_sprites.remove(sprite)
                         monsters_group.remove(sprite)
         screen.fill((255, 255, 255))
+        closed = False
+        for monster in monsters_group:
+            if monster.room == player.room:
+                closed = True
+                break
+        if closed:
+            for door in doors_group:
+                door.state = False
+        else:
+            for door in doors_group:
+                door.state = True
+        doors_group.update()
         player_group.update()
         monsters_group.update()
         trap_group.update()
         ordered = make_order(ordered)
         ordered.draw(screen)
         pygame.draw.rect(screen, (0, 0, 0), (0, 0, BAR_WIDTH, BAR_HEIGHT))
+        screen.blit(life, (16, 16))
         health_bar_group.draw(screen)
         projectile_group.draw(screen)
         projectile_group.update()
@@ -619,6 +665,6 @@ while True:
         pygame.draw.rect(screen, (255, 255, 255), (449, 16, 10, 32))
         pygame.draw.rect(screen, (255, 255, 255), (469, 16, 10, 32))
     if inputer[5] == 'skull':
-        Skull((3, 3))
+        Skull((randint(1, 14), randint(1, 10)), player.room)
     clock.tick(FPS)
     pygame.display.flip()
