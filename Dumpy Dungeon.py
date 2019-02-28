@@ -112,6 +112,7 @@ class DamageWave(pygame.sprite.Sprite):
 class Skull(pygame.sprite.Sprite):
     def __init__(self, pos):
         super().__init__(all_sprites, monsters_group)
+        print("summoned!")
         self.image = monster_images['skull0']
         self.rect = self.image.get_rect()
         self.rect.x = pos[0] * 32
@@ -135,12 +136,13 @@ class Skull(pygame.sprite.Sprite):
                 break
         for sprite in walls_group:
             if pygame.sprite.collide_rect(self, sprite) and pygame.sprite.collide_mask(self, sprite):
-                collides = True
-                if sprite.type in ['top', 'bot']:
-                    self.dy *= -1
-                else:
-                    self.dx *= -1
-                break
+                if not "collides" in locals():
+                    collides = True
+                    if sprite.type in ['top', 'bot']:
+                        self.dy *= -1
+                    else:
+                        self.dx *= -1
+                    break
         if "collides" in locals():
             self.rect.x -= self.speed * dx
             self.rect.y -= self.speed * dy
@@ -172,18 +174,6 @@ class Peaks(pygame.sprite.Sprite):
                             health_bar.recieve_damage()
                             player.animation = 0
                             player.invincible = True
-
-
-class HealthBar():
-    def __init__(self):
-        self.HP = 10
-
-    def recieve_damage(self):
-        self.HP -= 1
-        if self.HP == 0:
-            terminate()
-        health_bar_group.update(self.HP)
-
 
 
 class HP(pygame.sprite.Sprite):
@@ -313,6 +303,27 @@ class Camera:
         return self.updating
 
 
+class Inputer:
+    def __init__(self):
+        self.str = ''
+        self.worked = True
+
+
+    def __getitem__(self, key):
+        if self.worked:
+            self.worked = False
+            return self.str[len(self.str) - key:]
+        else:
+            return False
+
+
+    def add(self, text):
+        self.str += str(text)
+        self.worked = True
+        if len(self.str) > 255:
+            self.str = self.str[len(self.str) - 255:]
+
+
 def make_order(ord_group):
     ord_group.empty()
     sp_list = sorted(list(all_sprites), key=lambda sp: sp.rect.y if type(sp) not in (Floor, Peaks) else -1)
@@ -415,6 +426,17 @@ SIZE = WIDTH, HEIGHT = 512, 448
 BAR_WIDTH, BAR_HEIGHT = 512, 0
 TILE_WIDTH, TILE_HEIGHT = 32, 32
 screen = pygame.display.set_mode(SIZE)
+pmm = pygame.mixer.music
+clock = pygame.time.Clock()
+FPS = 60
+check = 0
+player_speed = 2
+camera = Camera()
+
+damage = pygame.mixer.Sound(join('data', 'music', 'Damage.ogg'))
+hit = pygame.mixer.Sound(join('data', 'music', 'Hit.WAV'))
+door = pygame.mixer.Sound(join('data', 'music', 'Door.WAV'))
+
 
 char_images = {'char' + h + str(n):pygame.image.load(join('data', 'char2', 'char' + h + str(n) + '.png'))  for n in range(4) for h in ['R', 'B', 'F']}
 char_images['damaged'] = pygame.image.load(join('data', 'char2', 'damaged.png'))
@@ -475,25 +497,14 @@ doors_group = pygame.sprite.Group()
 projectile_group = pygame.sprite.Group()
 
 
-
-clock = pygame.time.Clock()
-pmm = pygame.mixer.music
 start_screen()
 BAR_HEIGHT = 64
-FPS = 60
-check = 0
-player_speed = 2
-camera = Camera()
 player = make_level()
+inputer = Inputer()
 make_statusbar()
 
 pmm.load(join('data', 'music', 'music.WAV'))
 pmm.play(-1)
-
-damage = pygame.mixer.Sound(join('data', 'music', 'Damage.ogg'))
-hit = pygame.mixer.Sound(join('data', 'music', 'Hit.WAV'))
-door = pygame.mixer.Sound(join('data', 'music', 'Door.WAV'))
-
 
 health_bar = HealthBar()
 
@@ -506,6 +517,7 @@ while True:
         if event.type == pygame.QUIT:
             terminate()
         if event.type == pygame.KEYDOWN:
+            inputer.add(chr(event.key))
             if event.key == pygame.K_e and not pause:
                 door.play()
                 doors_group.update()
@@ -560,5 +572,7 @@ while True:
     else:
         pygame.draw.rect(screen, (255, 255, 255), (449, 16, 10, 32))
         pygame.draw.rect(screen, (255, 255, 255), (469, 16, 10, 32))
+    if inputer[5] == 'skull':
+        Skull((3, 3))
     clock.tick(FPS)
     pygame.display.flip()
