@@ -113,25 +113,22 @@ class Skull(pygame.sprite.Sprite):
         self.rect.x = pos[0] * 32
         self.rect.y = pos[1] * 32 + BAR_HEIGHT
         self.mask = pygame.mask.from_surface(self.image)
-        self.dir_x = 1
-        self.dir_y = 1
+        self.dir = 0
         self.animation = 0
         self.speed = 2
 
     def update(self):
-        self.rect.x += self.speed * self.dir_x
-        self.rect.y += self.speed * self.dir_y
+        dx, dy = (1, 1) if not self.dir else (1, -1) if self.dir == 1 else (-1, -1) if self.dir == 2 else (-1, 1)
+        self.rect.x += self.speed * dx
+        self.rect.y += self.speed * dy
         if pygame.sprite.spritecollideany(self, walls_group) or \
                 pygame.sprite.spritecollideany(self, doors_group):
-            if self.rect.x < 33 or self.rect.x > 480:
-                self.dir_x *= (-1)
-            if self.rect.y < 97 or self.rect.y > 416:
-                self.dir_y *= (-1)
-            self.rect.x -= self.speed * self.dir_x * (-1)
-            self.rect.y -= self.speed * self.dir_y * (-1)
+            self.dir = (self.dir + 1) % 4 
+            self.rect.x -= self.speed * dx
+            self.rect.y -= self.speed * dy
         self.animation = (self.animation + 1) % FPS
         self.image = monster_images['skull' + str(self.animation // (FPS // 4))]
-        if self.dir_x == -1:
+        if dx == -1:
             self.image = pygame.transform.flip(self.image, True, False)
 
 
@@ -264,6 +261,12 @@ def terminate():
     pygame.quit()
     sys.exit()
 
+def make_order(ord_group):
+    ord_group.empty()
+    sp_list = sorted(list(all_sprites), key=lambda sp: sp.rect.y if type(sp) is not Floor else -1)
+    ord_group.add(sp_list)
+    return ord_group
+
 def make_statusbar():
     for i in range(5):
         HP(i)
@@ -380,14 +383,16 @@ walls_group = pygame.sprite.Group()
 doors_group = pygame.sprite.Group()
 projectile_group = pygame.sprite.Group()
 
+
 player = make_level()
 make_statusbar()
 
 FPS = 60
 clock = pygame.time.Clock()
 
-pygame.mixer.music.load(join('data', 'music', 'music.WAV'))
-pygame.mixer.music.play()
+pmm = pygame.mixer.music
+pmm.load(join('data', 'music', 'music.WAV'))
+pmm.play(-1)
 
 damage = pygame.mixer.Sound(join('data', 'music', 'Damage.ogg'))
 
@@ -395,6 +400,10 @@ camera = Camera()
 check = 0
 
 health_bar = HealthBar()
+
+ordered = make_order(pygame.sprite.OrderedUpdates())
+to_order = False
+pause = False
 
 while True:
     for event in pygame.event.get():
@@ -405,37 +414,45 @@ while True:
                 doors_group.update()
             if event.key == pygame.K_SPACE:
                 player.attack()
-    if camera.is_updating():
-        for sprite in tiles_group:
-            camera.apply(sprite)
-        for sprite in player_group:
-            camera.apply(sprite)
-        for sprite in monsters_group:
-            camera.apply(sprite)
-        camera.tick()
-    else:
-        keys = pygame.key.get_pressed()
-        if keys[273] or keys[119]:
-            player.move(0, -TILE_HEIGHT // 16)
-        if keys[274] or keys[115]:
-            player.move(0, TILE_HEIGHT // 16)
-        if keys[275] or keys[pygame.K_d]:
-            player.move(TILE_WIDTH // 16, 0)
-        if keys[276] or keys[97]:
-            player.move(-TILE_WIDTH // 16, 0)
-    for dmg_wave in projectile_group:
-        if pygame.sprite.spritecollideany(dmg_wave, monsters_group):
+            if event.key == pygame.K_p:
+                pause = not pause
+                if pause:
+                    pmm.pause()
+                else:
+                    pmm.unpause()
+    if not pause:
+        if camera.is_updating():
+            for sprite in tiles_group:
+                camera.apply(sprite)
+            for sprite in player_group:
+                camera.apply(sprite)
             for sprite in monsters_group:
-                if pygame.sprite.collide_mask(dmg_wave, sprite):
-                    all_sprites.remove(sprite)
-                    monsters_group.remove(sprite)
-    screen.fill((255, 255, 255))
-    player_group.update()
-    monsters_group.update()
-    all_sprites.draw(screen)
-    pygame.draw.rect(screen, (0, 0, 0), (0, 0, BAR_WIDTH, BAR_HEIGHT))
-    health_bar_group.draw(screen)
-    projectile_group.draw(screen)
-    projectile_group.update()
+                camera.apply(sprite)
+            camera.tick()
+        else:
+            keys = pygame.key.get_pressed()
+            if keys[273] or keys[119]:
+                player.move(0, -TILE_HEIGHT // 16)
+            if keys[274] or keys[115]:
+                player.move(0, TILE_HEIGHT // 16)
+            if keys[275] or keys[pygame.K_d]:
+                player.move(TILE_WIDTH // 16, 0)
+            if keys[276] or keys[97]:
+                player.move(-TILE_WIDTH // 16, 0)
+        for dmg_wave in projectile_group:
+            if pygame.sprite.spritecollideany(dmg_wave, monsters_group):
+                for sprite in monsters_group:
+                    if pygame.sprite.collide_mask(dmg_wave, sprite):
+                        all_sprites.remove(sprite)
+                        monsters_group.remove(sprite)
+        screen.fill((255, 255, 255))
+        player_group.update()
+        monsters_group.update()
+        ordered = make_order(ordered)
+        ordered.draw(screen)
+        pygame.draw.rect(screen, (0, 0, 0), (0, 0, BAR_WIDTH, BAR_HEIGHT))
+        health_bar_group.draw(screen)
+        projectile_group.draw(screen)
+        projectile_group.update()
     clock.tick(FPS)
     pygame.display.flip()
