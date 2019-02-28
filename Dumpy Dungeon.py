@@ -66,6 +66,8 @@ class Player(pygame.sprite.Sprite):
         if self.direction == 1:
             self.image = pygame.transform.flip(self.image, True, False)
         if pygame.sprite.spritecollideany(self, monsters_group):
+            oldmask = self.mask
+            self.mask = pygame.mask.from_surface(self.image)
             for sprite in monsters_group:
                 if pygame.sprite.collide_mask(self, sprite):
                     if not self.invincible:
@@ -73,7 +75,7 @@ class Player(pygame.sprite.Sprite):
                         health_bar.recieve_damage()
                         self.animation = 0
                         self.invincible = True
-
+            self.mask = oldmask
         
     def get_x(self):
         return self.rect.x
@@ -113,17 +115,31 @@ class Skull(pygame.sprite.Sprite):
         self.rect.x = pos[0] * 32
         self.rect.y = pos[1] * 32 + BAR_HEIGHT
         self.mask = pygame.mask.from_surface(self.image)
-        self.dir = 0
+        self.dx = self.dy = 1
         self.animation = 0
         self.speed = 2
 
     def update(self):
-        dx, dy = (1, 1) if not self.dir else (1, -1) if self.dir == 1 else (-1, -1) if self.dir == 2 else (-1, 1)
+        dx, dy = self.dx, self.dy
         self.rect.x += self.speed * dx
         self.rect.y += self.speed * dy
-        if pygame.sprite.spritecollideany(self, walls_group) or \
-                pygame.sprite.spritecollideany(self, doors_group):
-            self.dir = (self.dir + 1) % 4 
+        for sprite in doors_group:
+            if pygame.sprite.collide_rect(self, sprite):
+                collides = True
+                if sprite.type in ['lf', 'rf']:
+                    self.dy *= -1
+                else:
+                    self.dx *= -1
+                break
+        for sprite in walls_group:
+            if pygame.sprite.collide_rect(self, sprite) and pygame.sprite.collide_mask(self, sprite):
+                collides = True
+                if sprite.type in ['top', 'bot']:
+                    self.dy *= -1
+                else:
+                    self.dx *= -1
+                break
+        if "collides" in locals():
             self.rect.x -= self.speed * dx
             self.rect.y -= self.speed * dy
         self.animation = (self.animation + 1) % FPS
@@ -201,6 +217,7 @@ class Wall(pygame.sprite.Sprite):
     def __init__(self, type, pos):
         super().__init__(all_sprites, tiles_group, walls_group)
         self.mask = mask('full')
+        self.type = type
         if type == 'top':
             self.image = wall_images['top' + str(randint(0, 2))]
         elif type == 'bot':
@@ -398,6 +415,7 @@ damage = pygame.mixer.Sound(join('data', 'music', 'Damage.ogg'))
 
 camera = Camera()
 check = 0
+player_speed = 2
 
 health_bar = HealthBar()
 
@@ -432,13 +450,13 @@ while True:
         else:
             keys = pygame.key.get_pressed()
             if keys[273] or keys[119]:
-                player.move(0, -TILE_HEIGHT // 16)
+                player.move(0, -player_speed)
             if keys[274] or keys[115]:
-                player.move(0, TILE_HEIGHT // 16)
+                player.move(0, player_speed)
             if keys[275] or keys[pygame.K_d]:
-                player.move(TILE_WIDTH // 16, 0)
+                player.move(player_speed, 0)
             if keys[276] or keys[97]:
-                player.move(-TILE_WIDTH // 16, 0)
+                player.move(-player_speed, 0)
         for dmg_wave in projectile_group:
             if pygame.sprite.spritecollideany(dmg_wave, monsters_group):
                 for sprite in monsters_group:
