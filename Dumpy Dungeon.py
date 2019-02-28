@@ -80,6 +80,7 @@ class Player(pygame.sprite.Sprite):
     def get_x(self):
         return self.rect.x
 
+
 class DamageWave(pygame.sprite.Sprite):
     def __init__(self, x, y, d):
         super().__init__(projectile_group)
@@ -148,45 +149,6 @@ class Skull(pygame.sprite.Sprite):
             self.image = pygame.transform.flip(self.image, True, False)
 
 
-class HealthBar(pygame.sprite.Sprite):
-    def __init__(self):
-        self.HP = 10
-
-    def recieve_damage(self):
-        self.HP -= 1
-        if self.HP == 0:
-            terminate()
-        health_bar_group.update(self.HP)
-
-
-class Camera:
-    def __init__(self):
-        self.dx = 0
-        self.dy = 0
-        self.count = 0
-        self.updating = False
-
-    def apply(self, obj):
-        obj.rect.x += self.dx * TILE_WIDTH
-        obj.rect.y += self.dy * TILE_HEIGHT
-
-    def tick(self):
-        self.count += 1
-        if self.count > 15:
-            self.updating = False
-            self.count = 0
-
-    def update(self, d):
-        if d[1]:
-            self.count = 4
-        self.updating = True
-        self.dx = d[0]
-        self.dy = d[1]
-
-    def is_updating(self):
-        return self.updating
-
-
 class HP(pygame.sprite.Sprite):
     def __init__(self, pos_x):
         self.num = pos_x * 2
@@ -202,6 +164,17 @@ class HP(pygame.sprite.Sprite):
             self.image = toolbar_images['half_heart']
         elif hp == 0:
             self.image = toolbar_images['empty_heart']
+
+
+class HealthBar(pygame.sprite.Sprite):
+    def __init__(self):
+        self.HP = 10
+
+    def recieve_damage(self):
+        self.HP -= 1
+        if self.HP == 0:
+            terminate()
+        health_bar_group.update(self.HP)
 
 
 class Floor(pygame.sprite.Sprite):
@@ -233,6 +206,7 @@ class Wall(pygame.sprite.Sprite):
         self.rect = self.image.get_rect()
         self.rect.x = pos[0] * TILE_WIDTH
         self.rect.y = pos[1] * TILE_HEIGHT + BAR_HEIGHT
+
 
 class Door(pygame.sprite.Sprite):
     def __init__(self, type, pos_x, pos_y):
@@ -274,9 +248,33 @@ class Door(pygame.sprite.Sprite):
         self.state = not self.state
 
 
-def terminate():
-    pygame.quit()
-    sys.exit()
+class Camera:
+    def __init__(self):
+        self.dx = 0
+        self.dy = 0
+        self.count = 0
+        self.updating = False
+
+    def apply(self, obj):
+        obj.rect.x += self.dx * TILE_WIDTH
+        obj.rect.y += self.dy * TILE_HEIGHT
+
+    def tick(self):
+        self.count += 1
+        if self.count > 15:
+            self.updating = False
+            self.count = 0
+
+    def update(self, d):
+        if d[1]:
+            self.count = 4
+        self.updating = True
+        self.dx = d[0]
+        self.dy = d[1]
+
+    def is_updating(self):
+        return self.updating
+
 
 def make_order(ord_group):
     ord_group.empty()
@@ -284,16 +282,45 @@ def make_order(ord_group):
     ord_group.add(sp_list)
     return ord_group
 
+
 def make_statusbar():
     for i in range(5):
         HP(i)
 
-def load_room(filename):
-    filename = join('data', 'rooms', filename)
-    with open(filename, 'r') as mapFile:
-        room_map = [line.strip() for line in mapFile]
-    max_width = max(map(len, room_map))
-    return list(map(lambda x: x.ljust(max_width, '.'), room_map))
+
+def start_screen():
+    fon = pygame.image.load(join('data', 'interface', 'fon.png'))
+    play = pygame.mixer.Sound(join('data', 'music', 'sfx_sounds_fanfare1.wav'))
+    pmm.load(join('data', 'music', "SSBU_OP.mp3"))
+    pmm.play()
+    for i in range(16):
+        for j in range(14):
+            Floor((i, j))
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                terminate()
+            elif event.type == pygame.KEYDOWN or \
+                    event.type == pygame.MOUSEBUTTONDOWN:
+                all_sprites.empty()
+                walls_group.empty()
+                tiles_group.empty()
+                play.play()
+                return  # начинаем игру
+        all_sprites.draw(screen)
+        screen.blit(fon, (0, 0))
+        pygame.display.flip()
+        clock.tick(100)
+
+
+def make_level():
+    make_room(load_room('room_0.txt'), 0, 0)
+    make_room(load_room('room_n.txt'), 0, -1)
+    make_room(load_room('room_e.txt'), 1, 0)
+    make_room(load_room('room_s.txt'), 0, 1)
+    make_room(load_room('room_w.txt'), -1, 0)
+    return Player((6, 6))
+
 
 def make_room(room, dx, dy):
     for i in range(4):
@@ -331,18 +358,22 @@ def make_room(room, dx, dy):
                 Skull((x + 16 * dx, y + 12 * dy))
 
 
-def make_level():
-    make_room(load_room('room_0.txt'), 0, 0)
-    make_room(load_room('room_n.txt'), 0, -1)
-    make_room(load_room('room_e.txt'), 1, 0)
-    make_room(load_room('room_s.txt'), 0, 1)
-    make_room(load_room('room_w.txt'), -1, 0)
-    return Player((6, 6))
+def load_room(filename):
+    filename = join('data', 'rooms', filename)
+    with open(filename, 'r') as mapFile:
+        room_map = [line.strip() for line in mapFile]
+    max_width = max(map(len, room_map))
+    return list(map(lambda x: x.ljust(max_width, '.'), room_map))
+
+
+def terminate():
+    pygame.quit()
+    sys.exit()
 
 
 pygame.init()
 SIZE = WIDTH, HEIGHT = 512, 448
-BAR_WIDTH, BAR_HEIGHT = 512, 64
+BAR_WIDTH, BAR_HEIGHT = 512, 0
 TILE_WIDTH, TILE_HEIGHT = 32, 32
 screen = pygame.display.set_mode(SIZE)
 
@@ -401,21 +432,23 @@ doors_group = pygame.sprite.Group()
 projectile_group = pygame.sprite.Group()
 
 
+
+clock = pygame.time.Clock()
+pmm = pygame.mixer.music
+start_screen()
+BAR_HEIGHT = 64
+FPS = 60
+check = 0
+player_speed = 2
+camera = Camera()
 player = make_level()
 make_statusbar()
 
-FPS = 60
-clock = pygame.time.Clock()
-
-pmm = pygame.mixer.music
 pmm.load(join('data', 'music', 'music.WAV'))
 pmm.play(-1)
 
 damage = pygame.mixer.Sound(join('data', 'music', 'Damage.ogg'))
 
-camera = Camera()
-check = 0
-player_speed = 2
 
 health_bar = HealthBar()
 
