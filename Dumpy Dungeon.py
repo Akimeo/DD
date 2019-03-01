@@ -43,18 +43,15 @@ class Player(pygame.sprite.Sprite):
             self.direction = 0
         elif y < 0:
             self.direction = 2
-        if self.rect.x > WIDTH:
-            camera.update((-1, 0))
-            self.room = (self.room[0] + 1, self.room[1])
-        elif self.rect.x + self.rect[2] < 0:
-            camera.update((1, 0))
-            self.room = (self.room[0] - 1, self.room[1])
-        if self.rect.y > HEIGHT:
-            camera.update((0, -1))
-            self.room = (self.room[0], self.room[1] - 1)
-        elif self.rect.y + self.rect[3] < BAR_HEIGHT:
-            camera.update((0, 1))
-            self.room = (self.room[0], self.room[1] + 1)
+        if not camera.is_updating():
+            if self.rect.x > WIDTH:
+                camera.update((-1, 0))
+            elif self.rect.x + self.rect[2] < 0:
+                camera.update((1, 0))
+            if self.rect.y > HEIGHT:
+                camera.update((0, -1))
+            elif self.rect.y + self.rect[3] < BAR_HEIGHT:
+                camera.update((0, 1))
         if self.m_anim_t == 10:
             self.m_anim_t = 0
             if self.m_anim != 'R':
@@ -129,7 +126,7 @@ class DamageWave(pygame.sprite.Sprite):
 class Fire(pygame.sprite.Sprite):
     def __init__(self, s_pos, p_pos):
         super().__init__(enemy_projectile_group)
-        self.image = interface_images['fire']
+        self.image = interface_images['fire0']
         self.rect = self.image.get_rect()
         self.x, self.y = self.rect.x, self.rect.y = s_pos
         self.mask = pygame.mask.from_surface(self.image)
@@ -139,10 +136,8 @@ class Fire(pygame.sprite.Sprite):
 
     def update(self):
         self.duration += 1
-        self.animation += 1
-        if self.animation == 15:
-            self.animation = 0
-            self.image = pygame.transform.flip(self.image, True, False)
+        self.animation = (self.animation + 1) % FPS
+        self.image = interface_images['fire' + str(self.animation // (FPS // 3))]
         self.x += self.p_pos[0] / FPS
         self.y += self.p_pos[1] / FPS
         self.rect.x, self.rect.y = int(self.x), int(self.y)
@@ -249,7 +244,6 @@ class Mage(pygame.sprite.Sprite):
                 self.image = self.n_im
             self.firerate -= 1
             self.animation -= 1
-            print(self.firerate, self.animation)
         elif self.room == player.room:
             self.active += 1
 
@@ -422,6 +416,7 @@ class Camera:
             self.count = 0
 
     def update(self, d):
+        player.room = (player.room[0] - d[0], player.room[1] + d[1])
         if d[1]:
             self.count = 4
         self.updating = True
@@ -626,7 +621,9 @@ toolbar_images = {
     'half_heart': pygame.image.load(join('data', 'interface', 'half_heart.png')),
     'empty_heart': pygame.image.load(join('data', 'interface', 'empty_heart.png'))}
 interface_images = {'dmg_wave': pygame.image.load(join('data', 'interface', 'dmg_wave.png')),
-                    'fire': pygame.image.load(join('data', 'interface', 'fire1.png'))}
+                    'fire0': pygame.image.load(join('data', 'interface', 'fire0.png')),
+                    'fire1': pygame.image.load(join('data', 'interface', 'fire1.png')),
+                    'fire2': pygame.image.load(join('data', 'interface', 'fire2.png'))}
 tile_images = {'floor_tile': pygame.image.load(
     join('data', 'tiles', 'floor_tile.png'))}
 wall_images = {
