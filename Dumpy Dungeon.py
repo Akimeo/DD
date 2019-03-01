@@ -176,7 +176,7 @@ class Skull(pygame.sprite.Sprite):
     def update(self):
         self.animation = (self.animation + 1) % FPS
         self.image = monster_images['skull' + str(self.animation // (FPS // 4))]
-        if self.active == 30:
+        if self.active > 30:
             dx, dy = self.dx, self.dy
             self.rect.x += self.speed * dx
             self.rect.y += self.speed * dy
@@ -190,7 +190,7 @@ class Skull(pygame.sprite.Sprite):
                     break
             for sprite in walls_group:
                 if pygame.sprite.collide_rect(self, sprite) and pygame.sprite.collide_mask(self, sprite):
-                    if "collides" not in locals():
+                    if "collides" not in locals() and sprite not in destroyable_group:
                         collides = True
                         if sprite.type in ['top', 'bot']:
                             self.dy *= -1
@@ -246,6 +246,17 @@ class Mage(pygame.sprite.Sprite):
             self.animation -= 1
         elif self.room == player.room:
             self.active += 1
+
+
+class Box(pygame.sprite.Sprite):
+    def __init__(self, pos, room):
+        super().__init__(all_sprites, destroyable_group, walls_group)
+        self.image = box_image
+        self.rect = self.image.get_rect()
+        self.rect.x = pos[0] * 32
+        self.rect.y = pos[1] * 32 + BAR_HEIGHT
+        self.mask = pygame.mask.from_surface(self.image)
+        self.room = room
 
 
 class Peaks(pygame.sprite.Sprite):
@@ -461,6 +472,8 @@ def start_screen():
     play = pygame.mixer.Sound(join('data', 'music', 'start_sfx.wav'))
     pmm.load(join('data', 'music', "SSBU_OP.mp3"))
     pmm.play()
+    colour = (randint(0, 255), randint(0, 255), randint(0, 255))
+    th = 0
     for i in range(16):
         for j in range(14):
             Floor((i, j))
@@ -477,10 +490,16 @@ def start_screen():
                 while pygame.mixer.get_busy():
                     sleep(0.8)
                 return  # начинаем игру
+        if th > 50:
+            th = 0
+            colour = (randint(0, 255), randint(0, 255), randint(0, 255))
+        text = start_font.render("PRESS ANY KEY TO START", False, colour)
         all_sprites.draw(screen)
         screen.blit(fon, (0, 0))
+        fon.blit(text, (80, 350))
         pygame.display.flip()
         clock.tick(100)
+        th += 1
 
 
 def end_screen():
@@ -502,6 +521,8 @@ def win_screen():
     pmm.load(join('data', 'music', "SSBU_OP.mp3"))
     pmm.play()
     ended = False
+    colour = (randint(0, 255), randint(0, 255), randint(0, 255))
+    th = 0
     h = 0
     while True:
         for event in pygame.event.get():
@@ -515,8 +536,13 @@ def win_screen():
         else:
             sleep(0.5)
             ended = True
+        if th > 40:
+            th = 0
+            colour = (randint(0, 255), randint(0, 255), randint(0, 255))
+        screen.blit(start_font.render("Total points: " + str(points), False, colour), (140, 350 + h))
         pygame.display.flip()
         clock.tick(FPS)
+        th += 1
 
 def make_level():
     make_room(load_room('room_0.txt'), 0, 0)
@@ -567,6 +593,8 @@ def make_room(room, dx, dy):
                 Mage((x + 16 * dx, y + 12 * dy), (dx, -dy), 'l')
             elif room[y][x] == '+':
                 Peaks((x + 16 * dx, y + 12 * dy), (dx, -dy))
+            elif room[y][x] == 'B':
+                Box((x + 16 * dx, y + 12 * dy), (dx, -dy))
 
 
 def load_room(filename):
@@ -598,6 +626,8 @@ clock = pygame.time.Clock()
 FPS = 60
 check = 0
 player_speed = 2
+point_font = pygame.font.Font("data/interface/furore.otf", 12)
+start_font = pygame.font.Font("data/interface/furore.otf", 24)
 camera = Camera()
 
 damage = pygame.mixer.Sound(join('data', 'music', 'Damage.ogg'))
@@ -607,6 +637,7 @@ fire = pygame.mixer.Sound(join('data', 'music', 'Fire.WAV'))
 spiketrap = pygame.mixer.Sound(join('data', 'music', 'Spiketrap.WAV'))
 
 life = pygame.image.load(join('data', 'interface', 'life.png'))
+box_image = pygame.image.load(join('data', 'tiles', 'box.png'))
 char_images = {'char' + h + str(n) + k:pygame.image.load(join('data', 'char', 'char' + h + str(n) + k + '.png'))  for n in range(4) for h in ['R', 'B', 'F'] for k in ['', 'R', 'L']}
 char_images['damaged'] = pygame.image.load(join('data', 'char', 'damaged.png'))
 
@@ -668,6 +699,7 @@ walls_group = pygame.sprite.Group()
 doors_group = pygame.sprite.Group()
 projectile_group = pygame.sprite.Group()
 enemy_projectile_group = pygame.sprite.Group()
+destroyable_group = pygame.sprite.Group()
 
 
 start_screen()
@@ -682,9 +714,9 @@ pmm.play(-1)
 health_bar = HealthBar()
 
 ordered = make_order(pygame.sprite.OrderedUpdates())
-to_order = False
 pause = False
 unblocked = False
+points = 0
 
 while True:
     for event in pygame.event.get():
@@ -714,6 +746,8 @@ while True:
                 camera.apply(sprite)
             for sprite in trap_group:
                 camera.apply(sprite)
+            for sprite in destroyable_group:
+                camera.apply(sprite)
             camera.tick()
         else:
             keys = pygame.key.get_pressed()
@@ -731,6 +765,17 @@ while True:
                     if pygame.sprite.collide_mask(dmg_wave, sprite):
                         all_sprites.remove(sprite)
                         monsters_group.remove(sprite)
+                        if type(sprite) == Mage:
+                            points += 10
+                        elif type(sprite) == Skull:
+                            points += 15
+            if pygame.sprite.spritecollideany(dmg_wave, destroyable_group):
+                for sprite in destroyable_group:
+                    if pygame.sprite.collide_mask(dmg_wave, sprite):
+                        all_sprites.remove(sprite)
+                        destroyable_group.remove(sprite)
+                        walls_group.remove(sprite)
+                        points += 5
         screen.fill((255, 255, 255))
         closed = False
         for monster in monsters_group:
@@ -770,6 +815,7 @@ while True:
     if inputer[3] == 'win' or not monsters_group:
         print('You won!')
         win_screen()
+    screen.blit(point_font.render("Points: " + str(points), False, (255, 255, 255)), (400, 40))
     clock.tick(FPS)
     pygame.display.flip()
  
