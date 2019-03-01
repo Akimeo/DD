@@ -20,6 +20,7 @@ class Player(pygame.sprite.Sprite):
         self.room = (0, 0)
 
     def move(self, x, y):
+        print(self.room)
         check = False
         self.rect.x += x
         self.rect.y += y
