@@ -2,6 +2,7 @@ import sys
 import pygame
 from random import randint
 from os.path import join
+from time import sleep
 
 
 class Player(pygame.sprite.Sprite):
@@ -161,6 +162,7 @@ class Fire(pygame.sprite.Sprite):
                     if pygame.sprite.collide_mask(self, sprite):
                         enemy_projectile_group.remove(self)
 
+
 class Skull(pygame.sprite.Sprite):
     def __init__(self, pos, room):
         super().__init__(all_sprites, monsters_group)
@@ -210,6 +212,44 @@ class Skull(pygame.sprite.Sprite):
                 fire.play()
                 Fire((self.rect.x, self.rect.y), (player.rect.x, player.rect.y))
             self.firerate -= 1
+        elif self.room == player.room:
+            self.active += 1
+
+
+
+class Mage(pygame.sprite.Sprite):
+    def __init__(self, pos, room, type='r'):
+        super().__init__(all_sprites, monsters_group)
+        self.n_im = pygame.image.load(join('data', 'monsters', 'skl_mage', 'mage.png'))
+        self.a_im = pygame.image.load(join('data', 'monsters', 'skl_mage', 'mage_at.png'))
+        if type == 'l':
+            self.n_im = pygame.transform.flip(self.n_im, True, False)
+            self.a_im = pygame.transform.flip(self.a_im, True, False)
+        self.image = self.n_im
+        self.rect = self.image.get_rect()
+        self.rect.x = pos[0] * 32
+        self.rect.y = pos[1] * 32 + BAR_HEIGHT
+        self.mask = mask("full")
+        self.room = room
+        self.animation = 0
+        self.firerate = 0
+        self.active = 0
+
+    def update(self):
+        if self.active > 30:
+            if self.firerate < 0 and self.animation in range(30):
+                self.firerate = 10
+                fire.play()
+                Fire((self.rect.x, self.rect.y), (player.rect.x, player.rect.y))
+            elif self.firerate < 0 and self.animation < 0:
+                self.animation = 60
+            if self.animation > 0 and self.image != self.a_im:
+                self.image = self.a_im
+            elif self.animation < 0 and self.image != self.n_im:
+                self.image = self.n_im
+            self.firerate -= 1
+            self.animation -= 1
+            print(self.firerate, self.animation)
         elif self.room == player.room:
             self.active += 1
 
@@ -265,7 +305,16 @@ class HealthBar(pygame.sprite.Sprite):
     def recieve_damage(self):
         self.HP -= 1
         if self.HP == 0:
-            terminate()
+            pmm.load("data/music/game_over.mp3")
+            pmm.play()
+            while pmm.get_busy():
+                player.invincible = True
+                player.timer = 0
+                player.update()
+                all_sprites.draw(screen)
+                clock.tick(FPS)
+                pygame.display.flip()
+            end_screen()
         health_bar_group.update(self.HP)
 
 
@@ -312,24 +361,24 @@ class Door(pygame.sprite.Sprite):
         self.state = False
         self.previous_state = False
 
-    def update(self):
+    def update(self, cheat=None):
         if self.state != self.previous_state:
             door_sound.play()
-        if self.state:
+        if self.state or cheat:
             if self.type == 'lf':
                 self.image = door_images['rbs']
             elif self.type == 'rf':
                 self.image = door_images['lbs']
             elif self.type == 'lts':
                 self.image = door_images['rf']
-                if not self.previous_state:
+                if not self.previous_state and not cheat:
                     self.rect.y -= TILE_HEIGHT // 2
             elif self.type == 'lbs':
                 self.image = pygame.transform.flip(
                     door_images['lf'], True, False)
             elif self.type == 'rts':
                 self.image = door_images['lf']
-                if not self.previous_state:
+                if not self.previous_state and not cheat:
                     self.rect.y -= TILE_HEIGHT // 2
             else:
                 self.image = door_images['lf']
@@ -390,11 +439,7 @@ class Inputer:
 
 
     def __getitem__(self, key):
-        if self.worked:
-            self.worked = False
-            return self.str[len(self.str) - key:]
-        else:
-            return False
+        return self.str[len(self.str) - key:]
 
 
     def add(self, text):
@@ -434,12 +479,49 @@ def start_screen():
                 walls_group.empty()
                 tiles_group.empty()
                 play.play()
+                while pygame.mixer.get_busy():
+                    sleep(0.8)
                 return  # начинаем игру
         all_sprites.draw(screen)
         screen.blit(fon, (0, 0))
         pygame.display.flip()
         clock.tick(100)
 
+
+def end_screen():
+    fon = pygame.image.load(join('data', 'interface', 'endgame.png'))
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                terminate()
+            elif event.type == pygame.KEYDOWN or \
+                    event.type == pygame.MOUSEBUTTONDOWN:
+                terminate()  # начинаем игру
+        screen.blit(fon, (0, 0))
+        pygame.display.flip()
+        clock.tick(FPS)
+
+
+def win_screen():
+    fon = pygame.image.load(join('data', 'interface', 'win_game.png'))
+    pmm.load(join('data', 'music', "SSBU_OP.mp3"))
+    pmm.play()
+    ended = False
+    h = 0
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                terminate()
+            elif event.type in [pygame.KEYDOWN, pygame.MOUSEBUTTONDOWN] and ended:
+                terminate()  # начинаем игру
+        if h > 448 - 1400:
+            screen.blit(fon, (0, h))
+            h -= 1
+        else:
+            sleep(0.5)
+            ended = True
+        pygame.display.flip()
+        clock.tick(FPS)
 
 def make_level():
     make_room(load_room('room_0.txt'), 0, 0)
@@ -484,6 +566,10 @@ def make_room(room, dx, dy):
                         Door('rbs', x + 16 * dx, y + 12 * dy)
             elif room[y][x] == '*':
                 Skull((x + 16 * dx, y + 12 * dy), (dx, -dy))
+            elif room[y][x] == 'M':
+                Mage((x + 16 * dx, y + 12 * dy), (dx, -dy))
+            elif room[y][x] == 'm':
+                Mage((x + 16 * dx, y + 12 * dy), (dx, -dy), 'l')
             elif room[y][x] == '+':
                 Peaks((x + 16 * dx, y + 12 * dy), (dx, -dy))
 
@@ -499,6 +585,12 @@ def load_room(filename):
 def terminate():
     pygame.quit()
     sys.exit()
+
+
+def update_masked_avatar():
+    surf = pygame.image.load("mask.png")
+    surf.blit(pygame.image.load("avatar1.png"), (0, 0), None, pygame.BLEND_RGBA_MULT)
+    return surf
 
 
 pygame.init()
@@ -534,7 +626,7 @@ toolbar_images = {
     'half_heart': pygame.image.load(join('data', 'interface', 'half_heart.png')),
     'empty_heart': pygame.image.load(join('data', 'interface', 'empty_heart.png'))}
 interface_images = {'dmg_wave': pygame.image.load(join('data', 'interface', 'dmg_wave.png')),
-                    'fire': pygame.image.load(join('data', 'interface', 'fire.png'))}
+                    'fire': pygame.image.load(join('data', 'interface', 'fire1.png'))}
 tile_images = {'floor_tile': pygame.image.load(
     join('data', 'tiles', 'floor_tile.png'))}
 wall_images = {
@@ -595,12 +687,14 @@ health_bar = HealthBar()
 ordered = make_order(pygame.sprite.OrderedUpdates())
 to_order = False
 pause = False
+unblocked = False
 
 while True:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             terminate()
         if event.type == pygame.KEYDOWN:
+            unblocked = True
             inputer.add(chr(event.key))
             if event.key == pygame.K_SPACE and not pause:
                 hit.play()
@@ -668,7 +762,17 @@ while True:
     else:
         pygame.draw.rect(screen, (255, 255, 255), (449, 16, 10, 32))
         pygame.draw.rect(screen, (255, 255, 255), (469, 16, 10, 32))
-    if inputer[5] == 'skull':
-        Skull((randint(1, 14), randint(1, 10)), player.room)
+    if unblocked:
+        unblocked = False
+        if inputer[5] == 'skull':
+            print('Cheat "Skull" activated!')
+            Skull((randint(1, 14), randint(1, 10)), player.room)
+        elif inputer[4] == 'door':
+            print('Cheat "Door" activated!')
+            doors_group.update(True)
+    if inputer[3] == 'win' or not monsters_group:
+        print('You won!')
+        win_screen()
     clock.tick(FPS)
     pygame.display.flip()
+ 
