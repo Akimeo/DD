@@ -21,7 +21,6 @@ class Player(pygame.sprite.Sprite):
         self.room = (0, 0)
 
     def move(self, x, y):
-        print(self.room)
         check = False
         self.rect.x += x
         self.rect.y += y
@@ -550,6 +549,7 @@ def make_level():
     make_room(load_room('room_e.txt'), 1, 0)
     make_room(load_room('room_s.txt'), 0, 1)
     make_room(load_room('room_w.txt'), -1, 0)
+    make_room(load_room('room2.txt'), 0, -2)
     return Player()
 
 
@@ -815,7 +815,7 @@ while True:
     if inputer[3] == 'win' or not monsters_group:
         print('You won!')
         win_screen()
-    screen.blit(point_font.render("Points: " + str(points), False, (255, 255, 255)), (400, 40))
+    screen.blit(point_font.render("Points: " + str(points), False, (255, 255, 255)), (300, 40))
     clock.tick(FPS)
     pygame.display.flip()
  
